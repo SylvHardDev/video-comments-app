@@ -21,7 +21,7 @@ export default function UploadPage() {
 
     const fileExt = file.name.split(".").pop();
     const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `videos/${fileName}`;
+    const filePath = `${fileName}`; // Assurez-vous que c'est correct
 
     // Upload dans Supabase Storage
     const { data, error } = await supabase.storage
