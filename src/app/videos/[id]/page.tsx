@@ -71,7 +71,9 @@ export default function VideoPage() {
             url={video?.url}
             controls
             onProgress={(state) => setCurrentTime(state.playedSeconds)}
-            ref={(ref) => (player = ref)}
+            ref={(ref) => {
+              player = ref;
+            }}
             width="100%"
             height="auto"
           />
