@@ -1,42 +1,54 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import ReactPlayer from "react-player";
-
-type Comment = {
-  id: string;
-  timestamp: number;
-  text: string;
-};
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function VideoPage() {
-  const { id } = useParams(); // Récupère l'ID de la vidéo depuis l'URL
-  const [video, setVideo] = useState<{ url: string } | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState("");
+  const { id } = useParams();
+  const [video, setVideo] = useState<{ name: string; url: string } | null>(
+    null
+  );
+  const [comments, setComments] = useState<
+    { id: string; text: string; timestamp: number }[]
+  >([]);
   const [currentTime, setCurrentTime] = useState(0);
-  const [loading, setLoading] = useState(true);
-  let player: ReactPlayer | null = null;
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const fetchVideo = async () => {
       const { data, error } = await supabase
         .from("videos")
-        .select("*")
+        .select("name, url")
         .eq("id", id)
         .single();
-      if (error) console.error("Erreur vidéo :", error.message);
+      if (error) console.error("Erreur récupération vidéo :", error.message);
       else setVideo(data);
-      setLoading(false);
     };
 
     const fetchComments = async () => {
       const { data, error } = await supabase
         .from("comments")
-        .select("*")
+        .select("id, text, timestamp")
         .eq("video_id", id);
-      if (error) console.error("Erreur commentaires :", error.message);
+      if (error)
+        console.error("Erreur récupération commentaires :", error.message);
       else setComments(data);
     };
 
@@ -45,73 +57,98 @@ export default function VideoPage() {
   }, [id]);
 
   const handleAddComment = async () => {
-    if (!newComment.trim()) return;
-    const { error } = await supabase
+    if (!newComment) return;
+    const { data, error } = await supabase
       .from("comments")
-      .insert([{ video_id: id, timestamp: currentTime, text: newComment }]);
-    if (error) {
-      console.error("Erreur lors de l'ajout du commentaire :", error.message);
-    } else {
+      .insert([{ video_id: id, text: newComment, timestamp: currentTime }]);
+    if (error) console.error("Erreur ajout commentaire :", error.message);
+    else {
       setComments([
         ...comments,
-        { id: Date.now().toString(), timestamp: currentTime, text: newComment },
+        { id: data[0].id, text: newComment, timestamp: currentTime },
       ]);
       setNewComment("");
+      setIsModalOpen(false);
     }
   };
 
+  if (!video) return <p>Chargement...</p>;
+
   return (
-    <div className="flex flex-col items-center min-h-screen p-4">
-      {loading ? (
-        <p>Chargement...</p>
-      ) : (
-        <>
-          <h1 className="text-2xl font-bold mb-4">Vidéo</h1>
-          <ReactPlayer
-            url={video?.url}
-            controls
-            onProgress={(state) => setCurrentTime(state.playedSeconds)}
-            ref={(ref) => {
-              player = ref;
-            }}
-            width="100%"
-            height="auto"
-          />
-          <div className="mt-4 w-full max-w-2xl">
-            <h2 className="text-lg font-semibold">Commentaires</h2>
-            <ul className="mt-2">
-              {comments.map((comment) => (
-                <li key={comment.id} className="p-2 border-b">
-                  <button
-                    onClick={() => player?.seekTo(comment.timestamp, "seconds")}
-                    className="text-blue-500"
-                  >
-                    {new Date(comment.timestamp * 1000)
-                      .toISOString()
-                      .substr(14, 5)}
-                  </button>{" "}
-                  - {comment.text}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4">
-              <input
-                type="text"
-                placeholder="Ajouter un commentaire..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="border p-2 w-full"
+    <div className="p-6 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">{video.name}</h1>
+      <div className="relative">
+        {/* Vidéo avec mise à jour du temps */}
+        <video
+          ref={videoRef}
+          className="w-full rounded-lg"
+          controls
+          onPause={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        >
+          <source src={video.url} type="video/mp4" />
+          Votre navigateur ne supporte pas la vidéo.
+        </video>
+
+        {/* Bouton Commenter en haut à droite */}
+        <Button
+          className="absolute top-2 right-2"
+          onClick={() => setIsModalOpen(true)}
+        >
+          Commenter
+        </Button>
+      </div>
+
+      {/* Barre de progression avec commentaires */}
+      <div className="relative mt-4 h-2 bg-gray-300 rounded-full overflow-hidden">
+        {comments.map((comment) => (
+          <TooltipProvider key={comment.id}>
+            <Tooltip>
+              <TooltipTrigger
+                className="absolute h-2 w-1 bg-red-500"
+                style={{
+                  left: videoRef.current
+                    ? `${
+                        (comment.timestamp / videoRef.current.duration) * 100
+                      }%`
+                    : "0%",
+                }}
               />
-              <button
-                onClick={handleAddComment}
-                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded"
-              >
-                Ajouter
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+              <TooltipContent>
+                <p>{comment.text}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ))}
+      </div>
+
+      {/* Fenêtre modale pour ajouter un commentaire */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un commentaire</DialogTitle>
+          </DialogHeader>
+          <Input type="text" disabled value={`À ${Math.floor(currentTime)}s`} />
+          <Textarea
+            placeholder="Votre commentaire..."
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+          />
+          <Button onClick={handleAddComment}>Envoyer</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Liste des commentaires */}
+      <h2 className="text-xl font-semibold mt-6">Commentaires</h2>
+      <ul>
+        {comments.map((comment) => (
+          <li key={comment.id} className="p-2 border-b">
+            <span className="text-gray-500">
+              {Math.floor(comment.timestamp)}s :
+            </span>{" "}
+            {comment.text}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

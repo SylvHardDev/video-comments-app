@@ -2,44 +2,52 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function VideosPage() {
+export default function VideoListPage() {
   const [videos, setVideos] = useState<
     { id: string; name: string; url: string }[]
   >([]);
-  const [loading, setLoading] = useState(true);
+  const [expandedVideo, setExpandedVideo] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchVideos = async () => {
-      const { data, error } = await supabase.from("videos").select("*");
-      if (error) {
-        console.error(
-          "Erreur lors de la récupération des vidéos :",
-          error.message
-        );
-      } else {
-        setVideos(data);
-      }
-      setLoading(false);
+      const { data, error } = await supabase
+        .from("videos")
+        .select("id, name, url");
+      if (error) console.error("Erreur récupération vidéos :", error.message);
+      else setVideos(data);
     };
 
     fetchVideos();
   }, []);
 
   return (
-    <div className="flex flex-col items-center min-h-screen p-4">
-      <h1 className="text-2xl font-bold mb-4">Liste des vidéos</h1>
-      {loading && <p>Chargement...</p>}
-      <ul className="w-full max-w-2xl">
-        {videos.map((video) => (
-          <li key={video.id} className="mb-4 p-4 border rounded-lg">
-            <h2 className="text-lg font-semibold">{video.name}</h2>
-            <Link href={`/videos/${video.id}`} className="text-blue-500">
-              Regarder
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Liste des Vidéos</h1>
+      {videos.map((video) => (
+        <Card key={video.id} className="mb-4">
+          <CardHeader
+            onClick={() =>
+              setExpandedVideo(expandedVideo === video.id ? null : video.id)
+            }
+          >
+            <CardTitle className="cursor-pointer">{video.name}</CardTitle>
+          </CardHeader>
+          {expandedVideo === video.id && (
+            <CardContent>
+              <video className="w-full rounded-lg" controls>
+                <source src={video.url} type="video/mp4" />
+                Votre navigateur ne supporte pas la vidéo.
+              </video>
+              <Link href={`/videos/${video.id}`}>
+                <Button className="mt-2">Lire la vidéo</Button>
+              </Link>
+            </CardContent>
+          )}
+        </Card>
+      ))}
     </div>
   );
 }
