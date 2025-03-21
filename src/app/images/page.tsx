@@ -42,7 +42,7 @@ export default function ImageGallery() {
 
     const { data, error } = await supabase.storage
       .from("images") // Vérifie que le bucket "images" existe
-      .upload(`uploads/${Date.now()}_${imageFile.name}`, imageFile);
+      .upload(`${Date.now()}_${imageFile.name}`, imageFile);
 
     if (error) {
       console.error("Erreur upload :", error.message);
